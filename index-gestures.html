@@ -1,54 +1,123 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Hand-Tracked 3D Particle System</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
+
     #info {
       position: fixed;
       bottom: 12px;
       left: 12px;
       color: #fff;
       font-family: system-ui, sans-serif;
-      font-size: 13px;
-      opacity: 0.85;
+      font-size: 14px;
+      background: rgba(0,0,0,0.55);
+      padding: 8px 12px;
+      border-radius: 8px;
+      z-index: 10;
+    }
+
+    /* CAMERA POPUP */
+    #cameraPopup {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .popup-content {
+      background: #111;
+      color: #fff;
+      padding: 28px 32px;
+      border-radius: 14px;
+      max-width: 380px;
+      text-align: center;
+      font-family: system-ui, sans-serif;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    }
+
+    .popup-content h3 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    .popup-content p {
+      font-size: 14px;
+      line-height: 1.5;
+      opacity: 0.9;
+    }
+
+    .popup-content button {
+      margin-top: 18px;
+      padding: 10px 22px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: #00e5ff;
+      color: #000;
+      font-weight: 600;
     }
   </style>
+
 </head>
 <body>
-<div id="info">
-  ✋ Open hand = expand • ✊ Fist = contract • ✌️ Switch shape
+
+<div id="info">Waiting for camera permission…</div>
+
+<!-- CAMERA POPUP (AUTO OPENS) -->
+
+<div id="cameraPopup">
+  <div class="popup-content">
+    <h3>Camera Access Required</h3>
+    <p>
+      This experience uses your camera for real-time hand gesture interaction.
+      <br><br>
+      Please allow camera access to continue.
+    </p>
+    <button id="enableCamera">Enable Camera</button>
+  </div>
 </div>
 
+<!-- LIBRARIES -->
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 
 <script>
-/* -------------------- THREE SETUP -------------------- */
+/* ===================== THREE SETUP ===================== */
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x000000, 20, 80);
+scene.fog = new THREE.Fog(0x000000, 25, 90);
 
-const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
 camera.position.z = 45;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(innerWidth, innerHeight);
+renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-/* -------------------- PARTICLES -------------------- */
-const COUNT = 8000;
+/* ===================== PARTICLES ===================== */
+const COUNT = 9000;
 const geometry = new THREE.BufferGeometry();
 const positions = new Float32Array(COUNT * 3);
 const colors = new Float32Array(COUNT * 3);
 
-geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
 const material = new THREE.PointsMaterial({
-  size: 0.25,
+  size: 0.28,
   vertexColors: true,
   transparent: true,
   opacity: 0.9
@@ -57,7 +126,7 @@ const material = new THREE.PointsMaterial({
 const particles = new THREE.Points(geometry, material);
 scene.add(particles);
 
-/* -------------------- SHAPES -------------------- */
+/* ===================== SHAPES ===================== */
 const shapes = {
   heart() {
     const t = Math.random() * Math.PI * 2;
@@ -67,29 +136,33 @@ const shapes = {
   flower() {
     const t = Math.random() * Math.PI * 2;
     const r = 6 * Math.sin(5 * t);
-    return [Math.cos(t) * r, Math.sin(t) * r, (Math.random() - 0.5)];
+    return [Math.cos(t) * r, Math.sin(t) * r, (Math.random() - 0.5) * 2];
   },
   saturn() {
     const a = Math.random() * Math.PI * 2;
-    return [Math.cos(a) * 8, (Math.random() - 0.5), Math.sin(a) * 8];
+    return [Math.cos(a) * 9, (Math.random() - 0.5) * 1.2, Math.sin(a) * 9];
+  },
+  fireworks() {
+    const v = new THREE.Vector3().randomDirection().multiplyScalar(Math.random() * 12);
+    return [v.x, v.y, v.z];
   }
 };
 
-let currentShape = "heart";
+let currentShape = 'heart';
 let expansion = 1;
 let hue = 0;
 
 function buildShape() {
   for (let i = 0; i < COUNT; i++) {
     const p = shapes[currentShape]();
-    positions.set([
-      p[0] * expansion,
-      p[1] * expansion,
-      p[2] * expansion
-    ], i * 3);
+    positions[i * 3]     = p[0] * expansion;
+    positions[i * 3 + 1] = p[1] * expansion;
+    positions[i * 3 + 2] = p[2] * expansion;
 
     const c = new THREE.Color(`hsl(${hue},100%,60%)`);
-    colors.set([c.r, c.g, c.b], i * 3);
+    colors[i * 3]     = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
   }
   geometry.attributes.position.needsUpdate = true;
   geometry.attributes.color.needsUpdate = true;
@@ -97,44 +170,33 @@ function buildShape() {
 
 buildShape();
 
-/* -------------------- MEDIAPIPE -------------------- */
-const video = document.createElement("video");
-video.style.display = "none";
+/* ===================== MEDIAPIPE ===================== */
+const video = document.createElement('video');
+video.style.display = 'none';
 document.body.appendChild(video);
 
-const hands = new Hands({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-});
+const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
 
-hands.setOptions({
-  maxNumHands: 1,
-  modelComplexity: 1,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.7
-});
-
-/* ---- debounce shape switch ---- */
 let lastSwitch = 0;
 
-hands.onResults(res => {
-  if (!res.multiHandLandmarks) return;
+hands.onResults(results => {
+  if (!results.multiHandLandmarks || !results.multiHandLandmarks.length) return;
+  const lm = results.multiHandLandmarks[0];
+  if (!lm || lm.length < 9) return;
 
-  const lm = res.multiHandLandmarks[0];
   const thumb = lm[4];
   const index = lm[8];
-
   const d = Math.hypot(thumb.x - index.x, thumb.y - index.y);
 
-  /* expansion */
-  expansion = THREE.MathUtils.lerp(expansion, d * 18, 0.15);
+  document.getElementById('info').innerText = `Pinch: ${d.toFixed(3)} | Shape: ${currentShape}`;
 
-  /* color */
-  hue = (hue + 0.5) % 360;
+  expansion = THREE.MathUtils.lerp(expansion, d * 30, 0.25);
+  hue = (hue + 1) % 360;
 
-  /* shape switch (pinch hold) */
-  if (d < 0.035 && performance.now() - lastSwitch > 800) {
-    currentShape = Object.keys(shapes)
-      [(Object.keys(shapes).indexOf(currentShape) + 1) % Object.keys(shapes).length];
+  if (d < 0.06 && performance.now() - lastSwitch > 700) {
+    const keys = Object.keys(shapes);
+    currentShape = keys[(keys.indexOf(currentShape) + 1) % keys.length];
     lastSwitch = performance.now();
   }
 
@@ -146,20 +208,35 @@ const cam = new Camera(video, {
   width: 640,
   height: 480
 });
-cam.start();
 
-/* -------------------- LOOP -------------------- */
+/* ===================== CAMERA POPUP LOGIC ===================== */
+const popup = document.getElementById('cameraPopup');
+const enableBtn = document.getElementById('enableCamera');
+
+enableBtn.addEventListener('click', async () => {
+  try {
+    await navigator.mediaDevices.getUserMedia({ video: true });
+    cam.start();
+    popup.style.display = 'none';
+    document.getElementById('info').innerText = 'Camera enabled. Show your hand ✋';
+  } catch (e) {
+    document.getElementById('info').innerText = 'Camera permission denied.';
+  }
+});
+
+/* ===================== RENDER LOOP ===================== */
 function animate() {
   requestAnimationFrame(animate);
   particles.rotation.y += 0.002;
+  particles.rotation.x += 0.001;
   renderer.render(scene, camera);
 }
 animate();
 
-window.addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight;
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 </script>
 
